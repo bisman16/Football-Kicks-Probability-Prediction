@@ -1,0 +1,144 @@
+---
+title: "A03_G34801183"
+author: "Bisman Sachar"
+date: "February 2, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Downloading data directly from the AWS link to the R mardown file and saving it in fkicks dataframe object
+
+```{r}
+fkicks <- read.table("https://s3.amazonaws.com/programmingforanalytics/footballkicks.csv", header = TRUE, sep = ",")
+
+```
+
+
+# PART A - Predicting Melvin's attemps at field goals using simple probabilities
+
+### Analyzing the data using str() and summary()
+
+```{r}
+str(fkicks)
+summary(fkicks)
+```
+
+It tells us that overall, Melvin scored 79.72% (759 out of 952 kicks) of the times he attempted. He played 90 matches & 862 practice matches. He attempted from 18 to 62 yards. yards is a continuous variable, goal is a discrete and categorical variable, practiceormatch is discrete & categorical variable
+
+### Checking confusion matrix at Melvin's attempts using prop.table(). 
+
+```{r}
+prop.table(table(fkicks$goal, fkicks$yards))
+prop.table(table(fkicks$goal, fkicks$practiceormatch))
+```
+
+
+### To get probabilities, we need to convert goal non-numeric levels into numeric levels
+
+```{r}
+fkicks$goal <- ifelse(fkicks$goal == "Y", 1,0)
+```
+
+### Calculating goal success rate differentiated by practice or match
+
+```{r}
+library(dplyr)
+fkicks %>% summarise(avggoal = mean(fkicks$goal))
+```
+#### Melvin's overall success rate is 79.72%
+
+```{r}
+fkicks %>% group_by(practiceormatch) %>% summarise(avggoal = mean(goal)) 
+```
+#### Melvin's goal success rate in matches is 82.2%. Melvin's goal success rate in practice is 79.5%. 
+
+
+
+# PART B - Predicting probabilites using logistic function.
+
+a)
+### i)Writing logistic function for practice
+
+### Creating a subset of data with only Practice (P)
+```{r}
+fkicks1 <- fkicks %>% filter(practiceormatch=="P")
+```
+
+### Running logistic function and finding intercept values
+
+```{r}
+goalp.log = glm(goal ~ yards,
+                  data = fkicks1,
+                  family=binomial)
+summary(goalp.log)
+```
+
+#### This gives us the logit function - ln(p/1-p) = 5.802 - 0.113 * yards, where p is the probability of goal
+
+### ii) Writing logistic function for matches
+
+### Creating a subset of data with only Match (M)
+```{r}
+fkicks2 <- fkicks %>% filter(practiceormatch=="M")
+```
+
+### Running logistic function and finding intercept values
+
+```{r}
+goalm.log = glm(goal ~ yards,
+                  data = fkicks2,
+                  family=binomial)
+summary(goalm.log)
+```
+
+#### This gives us the logit function - ln(p/1-p) = 4.837 - 0.0812 * yards, where p is the probability of goal
+
+### b) Finding probability of scoring a goal when Melvin kicks from 20, 40 and 60 yards in practice
+
+### Creating a new pdata variable for yards values - 20, 40 & 60
+```{r}
+pdata <- c(20, 40, 60)
+```
+
+### Predicting values using predict() by passing the above pdata variable
+```{r}
+predict(goalp.log, data.frame(yards=pdata), type="response")
+```
+
+#### Melvin's probability of goal success for 20, 40 and 60 yards is 0.972, 0.779 and 0.268 respectively.
+
+### c) Finding probability scoring a goal when Melvin kicks from 20, 40 and 60 yards in match
+
+### Creating a new mdata variable for yards values - 20, 40 & 60
+```{r}
+mdata <- c(20, 40, 60)
+```
+
+### Predicting values using predict() by passing the above pdata variable
+```{r}
+predict(goalm.log, data.frame(yards=mdata), type="response")
+```
+#### Melvin's probability of goal success for 20, 40 and 60 yards is 0.961, 0.830 and 0.490 respectively.
+
+
+# PART C - Plotting the logistic model using ggplot
+
+```{r}
+# Calling the ggplot2 library
+library(ggplot2)
+
+#Using fkicks data set in ggplot function, gave x variable as yards and y variable as goal
+ggplot(fkicks, aes(x=yards, y=goal, color=practiceormatch)) +
+ 
+# Using stat_smooth function, used glm - binomial (logit) model  
+stat_smooth(method="glm", se=FALSE, method.args = list(family=binomial), size = 2) + 
+
+# Gave labels to x & y axis, also gave the title to the plot
+ylab("Proabability of scoring a goal") + xlab("Distance to goal in yards") + ggtitle("Proabability of scoring a goal")
+
+
+```
+
